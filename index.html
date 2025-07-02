@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>YouTube-Playlist • Shuffle • Endlosschleife</title>
+
+<!-- Groß-flächen­iges Video ohne Scrollbars -->
+<style>
+  html,body{margin:0;height:100%;background:#000;overflow:hidden}
+  #player{position:absolute;top:0;left:0;width:100%;height:100%}
+</style>
+
+<!-- YouTube-iFrame-API laden (muss exakt so ohne [] stehen!) -->
+<script src="https://www.youtube.com/iframe_api"></script>
+
+<script>
+/* ======= 1. HIER DEINE PLAYLIST-ID EINTRAGEN ======= */
+const PLAYLIST = 'PLcqnA2uUrX6YHmWp3rd3N0CLLQRr7SHKC';
+/* ================================================ */
+
+let player;         // YouTube-Player-Objekt
+let watchdog;       // Intervall-ID für den „Aufwecker“
+
+/* 2. Wird automatisch aufgerufen, sobald die API fertig geladen ist */
+function onYouTubeIframeAPIReady(){
+  player = new YT.Player('player',{
+    playerVars:{
+      listType: 'playlist',   // zwingend bei Playlists
+      list: PLAYLIST,         // ID der Playlist
+      autoplay: 1,            // sofort starten
+      controls: 0,            // Player-UI ausblenden
+      loop: 1,                // Endlosschleife
+      playlist: PLAYLIST,     // nötig, damit loop sauber funktioniert
+      mute: 1,                // stumm starten → Autoplay ohne Klick
+      disablekb: 1, fs: 0, modestbranding: 1
+    },
+    events:{
+      onReady: onPlayerReady,
+      onStateChange: onPlayerState
+    }
+  });
+}
+
+/* 3. Sobald der Player bereit ist … */
+function onPlayerReady(e){
+  e.target.unMute();          // Ton einschalten
+  e.target.setShuffle(true);  // Shuffle aktivieren
+  /* optional → Lautstärke setzen, falls gewünscht:
+     e.target.setVolume(50);  // 0–100
+  */
+}
+
+/* 4. Zustands­wechsel auffangen – nie anhalten lassen */
+function onPlayerState(e){
+  const st = e.data;
+  if(st === 2){                     // 2 = PAUSED
+    setTimeout(()=>player.playVideo(),500);
+  }
+  if(st === 0){                     // 0 = ENDED (Playlist neu gestartet)
+    player.setShuffle(true);        // Shuffle-Schutz für Neustart
+  }
+}
+
+/* 5. Kleiner „Wachhund“: spielt alle 2 min an,
+      falls YouTube aus irgendeinem Grund stoppt */
+watchdog = setInterval(()=>{
+  if(player && player.getPlayerState() !== 1){ // 1 = PLAYING
+    player.playVideo();
+  }
+}, 120000);   // 120 000 ms = 2 min
+</script>
+</head>
+
+<body>
+  <div id="player"></div>
+</body>
+</html>
