@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>YT-Playlist • Shuffle • Loop (ES5)</title>
+<title>YT-Playlist – Shuffle & Loop (ES5, Autoplay-sicher)</title>
 <style>
   html,body{margin:0;height:100%;background:#000;overflow:hidden}
   #player{position:absolute;top:0;left:0;width:100%;height:100%}
@@ -11,27 +11,25 @@
 <!-- YouTube-iFrame-API -->
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
-/* ==== HIER DEINE PLAYLIST-ID ==== */
+/* ===== HIER DEINE PLAYLIST-ID EINFÜGEN ===== */
 var PLAYLIST = 'PLcqnA2uUrX6YHmWp3rd3N0CLLQRr7SHKC';
-/* ================================ */
+/* ========================================== */
 
 var player;
 var watchdog;
+var kickstartTries = 0;
 
-/* 1) Wird von der API aufgerufen, sobald sie geladen ist */
+/* 1) API fertig → Player anlegen */
 function onYouTubeIframeAPIReady(){
   player = new YT.Player('player',{
     playerVars:{
       listType:'playlist',
       list:PLAYLIST,
-      autoplay:1,
+      autoplay:1,        /* Browser versucht von selbst zu starten …   */
+      mute:1,            /* … weil stumm – Autoplay-Policy erfüllt      */
       loop:1,
       playlist:PLAYLIST,
-      mute:1,
-      controls:0,
-      disablekb:1,
-      fs:0,
-      modestbranding:1
+      controls:0, disablekb:1, fs:0, modestbranding:1, playsinline:1
     },
     events:{
       'onReady': onPlayerReady,
@@ -40,26 +38,39 @@ function onYouTubeIframeAPIReady(){
   });
 }
 
-/* 2) Player ist bereit  */
+/* 2) Player bereit  → mehrfach Play schicken, bis er läuft */
 function onPlayerReady(e){
-  e.target.playVideo();      // falls Autoplay geblockt wird
-  e.target.setShuffle(true); // Shuffle aktivieren
-  // Ton erst nach 5 s einschalten → Autoplay-Blockade umgehen
-  setTimeout(function(){ e.target.unMute(); }, 5000);
+  kickstart();                  // erste Play-Sequenz
+  e.target.setShuffle(true);    // Shuffle aktiv
+  /* nach 6 s Ton einschalten – dann sind wir sicher, dass es läuft */
+  setTimeout(function(){ e.target.unMute(); }, 6000);
+}
+
+/* Kickstart schickt bis zu 5× playVideo(), im Abstand von 500 ms */
+function kickstart(){
+  if(player && kickstartTries < 5 && player.getPlayerState() !== 1){
+    player.playVideo();
+    kickstartTries++;
+    setTimeout(kickstart, 500);
+  }
 }
 
 /* 3) Nie stehen bleiben */
 function onPlayerStateChange(e){
   var st = e.data;
-  if(st === 2){                    // 2 = PAUSED
+  if(st === 2){                    /* PAUSED */
     setTimeout(function(){ player.playVideo(); }, 500);
   }
-  if(st === 0){                    // 0 = ENDED
-    player.setShuffle(true);       // Shuffle erneut setzen
+  if(st === 0){                    /* ENDED – Schleife neu */
+    player.setShuffle(true);       /* Shuffle erneut ein */
+  }
+  if(st === -1 || st === 5){       /* UNSTARTED / VIDEO_CUED */
+    kickstartTries = 0;
+    kickstart();
   }
 }
 
-/* 4) „Wachhund“: alle 2 min Play, falls etwas hängt */
+/* 4) Wachhund drückt alle 2 min Play – maximale Ausfallsicherheit */
 watchdog = setInterval(function(){
   if(player && player.getPlayerState && player.getPlayerState() !== 1){
     player.playVideo();
